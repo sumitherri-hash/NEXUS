@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>NEXUS — V1</title>
+
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#050812;font-family:Arial,sans-serif}
+#game{position:fixed;inset:0}
+#hud{
+ position:fixed;top:15px;left:15px;right:15px;
+ display:flex;justify-content:space-between;
+ pointer-events:none;color:white;z-index:5
+}
+.panel{
+ background:rgba(5,10,25,.72);
+ border:1px solid rgba(80,190,255,.35);
+ border-radius:12px;padding:10px 14px;
+ backdrop-filter:blur(8px)
+}
+.logo{font-weight:800;letter-spacing:3px;font-size:18px}
+.status{font-size:11px;color:#8de7ff;margin-top:3px}
+#agent{
+ position:fixed;left:50%;top:15px;transform:translateX(-50%);
+ color:white;z-index:5;text-align:center;
+ pointer-events:none
+}
+#agent span{font-size:11px;color:#8de7ff}
+#controls{
+ position:fixed;left:20px;bottom:25px;width:145px;height:145px;
+ z-index:10;touch-action:none
+}
+.btn{
+ position:absolute;width:52px;height:52px;border-radius:50%;
+ border:1px solid rgba(100,210,255,.5);
+ background:rgba(15,30,55,.72);color:white;
+ font-size:22px;display:flex;align-items:center;justify-content:center;
+ user-select:none;touch-action:none
+}
+#up{left:46px;top:0}
+#left{left:0;top:47px}
+#down{left:46px;top:94px}
+#right{left:92px;top:47px}
+#interact{
+ position:fixed;right:22px;bottom:35px;
+ width:76px;height:76px;border-radius:50%;
+ border:1px solid rgba(100,220,255,.7);
+ background:rgba(10,35,60,.8);color:white;
+ z-index:10;font-size:12px;touch-action:none
+}
+#message{
+ position:fixed;left:50%;bottom:135px;transform:translateX(-50%);
+ color:white;background:rgba(0,0,0,.65);padding:10px 16px;
+ border-radius:10px;opacity:0;transition:.25s;z-index:20;
+ text-align:center;white-space:nowrap
+}
+@media(min-width:800px){
+ #controls{opacity:.75}
+}
+</style>
+</head>
+
+<body>
+<div id="game"></div>
+
+<div id="hud">
+ <div class="panel">
+   <div class="logo">NEXUS</div>
+   <div class="status">V1 // WORLD ONLINE</div>
+ </div>
+ <div class="panel">
+   <div>PLAYER 01</div>
+   <div class="status">CONNECTED</div>
+ </div>
+</div>
+
+<div id="agent" class="panel">
+ <b>AI AGENT CORE</b><br>
+ <span>STANDBY — AWAITING CONNECTION</span>
+</div>
+
+<div id="controls">
+ <div class="btn" id="up">▲</div>
+ <div class="btn" id="left">◀</div>
+ <div class="btn" id="down">▼</div>
+ <div class="btn" id="right">▶</div>
+</div>
+
+<button id="interact">INTERACT</button>
+<div id="message"></div>
+
+<script type="module">
+import * as THREE from
+"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x050812);
+scene.fog = new THREE.Fog(0x050812,25,130);
+
+const camera = new THREE.PerspectiveCamera(
+ 65,innerWidth/innerHeight,.1,300
+);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;
+document.getElementById("game").appendChild(renderer.domElement);
+
+/* LIGHTING */
+scene.add(new THREE.HemisphereLight(0x9edcff,0x111522,1.5));
+
+const sun = new THREE.DirectionalLight(0xffffff,1.7);
+sun.position.set(20,40,20);
+sun.castShadow=true;
+scene.add(sun);
+
+/* GROUND */
+const ground = new THREE.Mesh(
+ new THREE.PlaneGeometry(180,180),
+ new THREE.MeshStandardMaterial({
+   color:0x101724,
+   roughness:.75,
+   metalness:.25
+ })
+);
+ground.rotation.x=-Math.PI/2;
+ground.receiveShadow=true;
+scene.add(ground);
+
+/* GRID */
+const grid = new THREE.GridHelper(180,90,0x16405b,0x102238);
+grid.position.y=.02;
+scene.add(grid);
+
+/* BUILDINGS */
+function building(x,z,w,h,d){
+ const mesh=new THREE.Mesh(
+  new THREE.BoxGeometry(w,h,d),
+  new THREE.MeshStandardMaterial({
+   color:0x172337,
+   roughness:.45,
+   metalness:.6
+  })
+ );
+ mesh.position.set(x,h/2,z);
+ mesh.castShadow=true;
+ mesh.receiveShadow=true;
+ scene.add(mesh);
+
+ const edges=new THREE.LineSegments(
+  new THREE.EdgesGeometry(mesh.geometry),
+  new THREE.LineBasicMaterial({color:0x247da8})
+ );
+ edges.position.copy(mesh.position);
+ scene.add(edges);
+
+ return mesh;
+}
+
+for(let i=0;i<18;i++){
+ const x=(Math.random()-.5)*100;
+ const z=(Math.random()-.5)*100;
+
+ if(Math.abs(x)<14 && Math.abs(z)<14) continue;
+
+ building(
+  x,z,
+  5+Math.random()*6,
+  8+Math.random()*22,
+  5+Math.random()*6
+ );
+}
+
+/* NEON HUB */
+const hub = new THREE.Mesh(
+ new THREE.CylinderGeometry(7,7,.8,48),
+ new THREE.MeshStandardMaterial({
+  color:0x152d42,
+  emissive:0x06344b,
+  emissiveIntensity:2,
+  metalness:.8
+ })
+);
+hub.position.y=.4;
+scene.add(hub);
+
+const ring = new THREE.Mesh(
+ new THREE.TorusGeometry(7.5,.08,12,80),
+ new THREE.MeshBasicMaterial({color:0x38cfff})
+);
+ring.rotation.x=Math.PI/2;
+ring.position.y=.8;
+scene.add(ring);
+
+/* PLAYER */
+const player = new THREE.Group();
+scene.add(player);
+
+const body=new THREE.Mesh(
+ new THREE.CapsuleGeometry(.65,1.4,8,16),
+ new THREE.MeshStandardMaterial({
+  color:0x8be8ff,
+  metalness:.7,
+  roughness:.25,
+  emissive:0x063b50,
+  emissiveIntensity:1
+ })
+);
+body.position.y=1.45;
+body.castShadow=true;
+player.add(body);
+
+const head=new THREE.Mesh(
+ new THREE.SphereGeometry(.42,20,20),
+ new THREE.MeshStandardMaterial({
+  color:0xd9f8ff,
+  metalness:.4,
+  roughness:.25
+ })
+);
+head.position.y=2.55;
+head.castShadow=true;
+player.add(head);
+
+/* PLAYER LIGHT */
+const playerLight=new THREE.PointLight(0x37d8ff,3,10);
+playerLight.position.y=2;
+player.add(playerLight);
+
+/* CAMERA */
+camera.position.set(0,5,8);
+scene.add(camera);
+
+/* MOVEMENT */
+const keys={
+ up:false,down:false,left:false,right:false
+};
+
+const speed=.11;
+
+function bind(id,key){
+ const el=document.getElementById(id);
+
+ const start=e=>{
+  e.preventDefault();
+  keys[key]=true;
+ };
+
+ const stop=e=>{
+  e.preventDefault();
+  keys[key]=false;
+ };
+
+ el.addEventListener("pointerdown",start);
+ el.addEventListener("pointerup",stop);
+ el.addEventListener("pointercancel",stop);
+ el.addEventListener("pointerleave",stop);
+}
+
+bind("up","up");
+bind("down","down");
+bind("left","left");
+bind("right","right");
+
+window.addEventListener("keydown",e=>{
+ if(e.key==="w"||e.key==="ArrowUp")keys.up=true;
+ if(e.key==="s"||e.key==="ArrowDown")keys.down=true;
+ if(e.key==="a"||e.key==="ArrowLeft")keys.left=true;
+ if(e.key==="d"||e.key==="ArrowRight")keys.right=true;
+});
+
+window.addEventListener("keyup",e=>{
+ if(e.key==="w"||e.key==="ArrowUp")keys.up=false;
+ if(e.key==="s"||e.key==="ArrowDown")keys.down=false;
+ if(e.key==="a"||e.key==="ArrowLeft")keys.left=false;
+ if(e.key==="d"||e.key==="ArrowRight")keys.right=false;
+});
+
+/* INTERACTION */
+const message=document.getElementById("message");
+
+function showMessage(text){
+ message.textContent=text;
+ message.style.opacity=1;
+ setTimeout(()=>message.style.opacity=0,2200);
+}
+
+document.getElementById("interact").addEventListener("pointerdown",()=>{
+ showMessage("NEXUS: AI AGENT LINK — INITIALIZING...");
+});
+
+/* ANIMATION */
+function animate(){
+ requestAnimationFrame(animate);
+
+ let dx=0,dz=0;
+
+ if(keys.up)dz-=1;
+ if(keys.down)dz+=1;
+ if(keys.left)dx-=1;
+ if(keys.right)dx+=1;
+
+ if(dx||dz){
+  const length=Math.hypot(dx,dz);
+  dx/=length;
+  dz/=length;
+
+  player.position.x+=dx*speed;
+  player.position.z+=dz*speed;
+
+  player.rotation.y=Math.atan2(dx,dz);
+ }
+
+ /* FOLLOW CAMERA */
+ const targetX=player.position.x;
+ const targetZ=player.position.z+7;
+
+ camera.position.x +=
+  (targetX-camera.position.x)*.08;
+
+ camera.position.z +=
+  (targetZ-camera.position.z)*.08;
+
+ camera.position.y +=
+  ((player.position.y+4.2)-camera.position.y)*.08;
+
+ camera.lookAt(
+  player.position.x,
+  player.position.y+1.2,
+  player.position.z
+ );
+
+ ring.rotation.z+=.005;
+
+ renderer.render(scene,camera);
+}
+
+animate();
+
+window.addEventListener("resize",()=>{
+ camera.aspect=innerWidth/innerHeight;
+ camera.updateProjectionMatrix();
+ renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+  </html>
